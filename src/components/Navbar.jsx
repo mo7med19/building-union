@@ -1,6 +1,5 @@
 import React from 'react';
 import { 
-  Building2, 
   LayoutDashboard, 
   Wallet, 
   Users, 
@@ -10,6 +9,7 @@ import {
   BookOpen,
   Settings
 } from 'lucide-react';
+import logoImage from '../assets/logo.png';
 
 export default function Navbar({ activeTab, setActiveTab, isAdmin }) {
   const navItems = [
@@ -27,14 +27,16 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin }) {
     <>
       {/* 1. الشريط العلوي للشاشات الكبيرة (Desktop Header) */}
       <header className="hidden md:block bg-slate-900/95 backdrop-blur-md text-white shadow-lg sticky top-0 z-40 border-b border-slate-800">
-        <div className="max-w-5xl mx-auto px-4 py-2.5 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-tr from-amber-600 to-amber-400 p-2 rounded-xl shadow-md shadow-amber-500/10">
-              <Building2 className="w-5 h-5 text-slate-950" />
-            </div>
+        <div className="max-w-5xl mx-auto px-4 py-2 flex justify-between items-center">
+          <div className="flex items-center gap-2.5">
+            <img 
+              src={logoImage} 
+              alt="شعار اتحاد الملاك" 
+              className="w-7 h-7 rounded-lg object-cover shadow-sm border border-amber-500/40" 
+            />
             <div>
-              <h1 className="font-extrabold text-sm leading-tight tracking-tight">إتحاد ملاك البرج</h1>
-              <span className="text-[10px] text-amber-400 font-medium block">
+              <h1 className="font-extrabold text-xs leading-tight tracking-tight">إتحاد ملاك البرج</h1>
+              <span className="text-[9px] text-amber-400 font-medium block">
                 {isAdmin ? 'لوحة التحكم الإدارية' : 'تطبيق السكان'}
               </span>
             </div>
@@ -64,14 +66,16 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin }) {
       </header>
 
       {/* 2. الشريط العلوي للجوال (Mobile Top Bar) */}
-      <div className="md:hidden bg-slate-900/95 backdrop-blur-md text-white px-4 py-3 border-b border-slate-800 sticky top-0 z-40 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="bg-gradient-to-tr from-amber-600 to-amber-400 p-1.5 rounded-xl shadow-sm">
-            <Building2 className="w-4 h-4 text-slate-950" />
-          </div>
+      <div className="md:hidden bg-slate-900/95 backdrop-blur-md text-white px-4 py-2.5 border-b border-slate-800 sticky top-0 z-40 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <img 
+            src={logoImage} 
+            alt="شعار اتحاد الملاك" 
+            className="w-6 h-6 rounded-md object-cover shadow-sm border border-amber-500/40" 
+          />
           <div>
             <h1 className="font-bold text-xs leading-tight">إتحاد ملاك البرج</h1>
-            <span className="text-[9px] text-amber-400/90 font-medium block">
+            <span className="text-[8px] text-amber-400/90 font-medium block">
               {isAdmin ? 'بوابة الأدمن' : 'بوابة الساكن'}
             </span>
           </div>
