@@ -7,18 +7,23 @@ export default function Maintenance({ maintenanceList, addMaintenance, updateSta
   const [apartment, setApartment] = useState('');
   const [description, setDescription] = useState('');
 
+  // حماية ضد أي قيم فارغة أو قيد التحميل
+  const list = maintenanceList || [];
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!title || !apartment) return;
 
-    addMaintenance({
-      id: Date.now(),
-      title,
-      apartment,
-      description,
-      status: 'pending',
-      date: new Date().toISOString().split('T')[0],
-    });
+    if (addMaintenance) {
+      addMaintenance({
+        id: Date.now(),
+        title,
+        apartment,
+        description,
+        status: 'pending',
+        date: new Date().toISOString().split('T')[0],
+      });
+    }
 
     setTitle('');
     setApartment('');
@@ -27,13 +32,13 @@ export default function Maintenance({ maintenanceList, addMaintenance, updateSta
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" dir="rtl">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <Wrench className="w-5 h-5 text-amber-500" /> طلبات الأعطال والصيانة
           </h2>
-          <p className="text-xs text-slate-500">الإبلاغ عن أعطال المرافق العامة ومتابعة حلها</p>
+          <p className="text-xs text-slate-500 mt-0.5">الإبلاغ عن أعطال المرافق العامة ومتابعة حلها</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
@@ -44,12 +49,12 @@ export default function Maintenance({ maintenanceList, addMaintenance, updateSta
       </div>
 
       <div className="space-y-3">
-        {maintenanceList.length === 0 ? (
+        {list.length === 0 ? (
           <div className="bg-white p-8 rounded-2xl border border-slate-200/80 text-center text-slate-400 text-xs">
             لا توجد طلبات صيانة مسجلة حالياً
           </div>
         ) : (
-          maintenanceList.map((item) => (
+          list.map((item) => (
             <div key={item.id} className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
               <div className="flex justify-between items-start">
                 <div>
@@ -87,13 +92,13 @@ export default function Maintenance({ maintenanceList, addMaintenance, updateSta
                   <span className="text-slate-400 font-mono text-[10px]">{item.date}</span>
                   <div className="flex gap-1.5">
                     <button
-                      onClick={() => updateStatus(item.id, 'in-progress')}
+                      onClick={() => updateStatus && updateStatus(item.id, 'in-progress')}
                       className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg transition"
                     >
                       قيد العمل
                     </button>
                     <button
-                      onClick={() => updateStatus(item.id, 'completed')}
+                      onClick={() => updateStatus && updateStatus(item.id, 'completed')}
                       className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-lg transition font-bold"
                     >
                       إتمام الإصلاح

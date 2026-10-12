@@ -25,7 +25,7 @@ export default function Dashboard({
   setActiveTab,
   isAdmin,
   currentUser,
-  apartments = [], // استقبال قائمة الشقق لمعرفة موقف الساكن
+  apartments = [], 
   auditLogs = []
 }) {
   const [announcements, setAnnouncements] = useState([
@@ -39,10 +39,10 @@ export default function Dashboard({
   const [newAnnouncement, setNewAnnouncement] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // تحديد شقة الساكن الحالي ديناميكياً
-  const myApartment = apartments.find(
-    (apt) => apt.number === currentUser?.apartment || apt.id === currentUser?.aptId
-  ) || apartments[0];
+  // تم تصحيح هذا السطر: لن يتم عرض أي شقة وهمية إذا كانت القاعدة فارغة
+  const myApartment = (apartments || []).find(
+    (apt) => apt.number === currentUser?.apartment || apt.id === currentUser?.aptId || apt.owner === currentUser?.name
+  );
 
   const totalTarget = totalCollected + totalPending;
   const collectionPercentage = totalTarget > 0 ? Math.round((totalCollected / totalTarget) * 100) : 0;
@@ -67,22 +67,51 @@ export default function Dashboard({
   };
 
   // ---------------------------------------------------------------------------
-  // 1. الرئيسية الخاصة بالساكن (Resident View) - ديناميكية وواقعية
+  // 1. الرئيسية الخاصة بالساكن (Resident View)
   // ---------------------------------------------------------------------------
   if (!isAdmin) {
+    if (!myApartment) {
+      return (
+        <div className="space-y-5" dir="rtl">
+          <div className="bg-white p-8 rounded-2xl border border-slate-200/80 text-center space-y-3 shadow-sm">
+            <Wallet className="w-12 h-12 text-slate-300 mx-auto" />
+            <h3 className="text-base font-bold text-slate-800">مرحباً بك، {currentUser?.name}</h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+              حسابك ليس مرتبطاً بأي شقة حالياً في قاعدة البيانات السحابية. يرجى التواصل مع إدارة المبنى لربط حسابك بشقتك.
+            </p>
+          </div>
+
+          {/* إعلانات البرج للساكن */}
+          <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 shadow-2xs space-y-3">
+            <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
+              <Bell className="w-4 h-4 text-amber-600 animate-pulse" />
+              إعلانات وتنبيهات إدارة البرج
+            </div>
+            <div className="space-y-2">
+              {announcements.map((item) => (
+                <div key={item.id} className="bg-white/80 p-3 rounded-xl border border-amber-200/50 space-y-1">
+                  <p className="text-xs text-amber-950 leading-relaxed font-medium">{item.text}</p>
+                  <span className="text-[10px] text-amber-700/60 block font-mono">{item.date}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const isPaid = myApartment?.paid;
     const isPending = myApartment?.status === 'pending_review';
 
     return (
       <div className="space-y-5" dir="rtl">
-        {/* كارت موقف الساكن الديناميكي */}
         <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-6 rounded-2xl shadow-lg border border-slate-700/80 relative overflow-hidden">
           <div className="absolute -left-10 -bottom-10 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
 
           <div className="flex justify-between items-start relative z-10">
             <div>
               <span className="text-xs text-amber-400 font-bold block mb-1">
-                مرحباً بك ({myApartment?.number || 'الساكن'})
+                مرحباً بك (شقة {myApartment?.number})
               </span>
               <h2 className="text-xl md:text-2xl font-black text-white">موقفي المالي لهذا الشهر</h2>
             </div>
@@ -97,7 +126,6 @@ export default function Dashboard({
               <span className="text-lg font-black text-white font-mono">200 ج.م</span>
             </div>
 
-            {/* عرض الحالة الحقيقية للساكن */}
             <div>
               {isPaid ? (
                 <span className="bg-emerald-500/20 text-emerald-400 text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1.5 border border-emerald-500/30">
@@ -124,7 +152,6 @@ export default function Dashboard({
           </div>
         </div>
 
-        {/* أزرار الخدمات السريعة للساكن */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <button
             onClick={() => setActiveTab('finance')}
@@ -166,7 +193,6 @@ export default function Dashboard({
           </button>
         </div>
 
-        {/* إعلانات البرج للساكن */}
         <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 shadow-2xs space-y-3">
           <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
             <Bell className="w-4 h-4 text-amber-600 animate-pulse" />
@@ -175,10 +201,7 @@ export default function Dashboard({
 
           <div className="space-y-2">
             {announcements.map((item) => (
-              <div 
-                key={item.id} 
-                className="bg-white/80 backdrop-blur-xs p-3 rounded-xl border border-amber-200/50 space-y-1"
-              >
+              <div key={item.id} className="bg-white/80 p-3 rounded-xl border border-amber-200/50 space-y-1">
                 <p className="text-xs text-amber-950 leading-relaxed font-medium">{item.text}</p>
                 <span className="text-[10px] text-amber-700/60 block font-mono">{item.date}</span>
               </div>
@@ -194,7 +217,6 @@ export default function Dashboard({
   // ---------------------------------------------------------------------------
   return (
     <div className="space-y-5" dir="rtl">
-      {/* كارت الرصيد والتحليلات */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-6 rounded-2xl shadow-lg border border-slate-700/80 relative overflow-hidden">
         <div className="absolute -left-10 -bottom-10 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
 
@@ -224,7 +246,6 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* الإحصائيات الإدارية */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
           <span className="text-xs text-slate-500 font-medium">المحصل هذا الشهر</span>
@@ -263,10 +284,8 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* سجل النشاطات */}
       <AuditLog logs={auditLogs} />
 
-      {/* الإعلانات والتنبيهات */}
       <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
@@ -284,15 +303,11 @@ export default function Dashboard({
 
         <div className="space-y-2">
           {announcements.map((item) => (
-            <div 
-              key={item.id} 
-              className="bg-white/80 backdrop-blur-xs p-3 rounded-xl border border-amber-200/50 flex justify-between items-start gap-3"
-            >
+            <div key={item.id} className="bg-white/80 p-3 rounded-xl border border-amber-200/50 flex justify-between items-start gap-3">
               <div className="space-y-1">
                 <p className="text-xs text-amber-950 leading-relaxed font-medium">{item.text}</p>
                 <span className="text-[10px] text-amber-700/60 block font-mono">{item.date}</span>
               </div>
-              
               <button
                 onClick={() => handleDeleteAnnouncement(item.id)}
                 className="text-amber-800/40 hover:text-rose-600 p-1 transition rounded-md"
@@ -305,7 +320,6 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* Modal إضافة إعلان للأدمن */}
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-2xl p-5 shadow-xl space-y-4">

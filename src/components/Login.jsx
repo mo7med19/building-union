@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { supabase } from '../supabaseClient';
 import { User, KeyRound, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import logoImage from '../assets/logo.png';
 
@@ -6,72 +7,96 @@ export default function Login({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // بيانات تجريبية للحسابات
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
-    // بيانات الأدمن الافتراضية
-    if (username === 'admin' && password === '123456') {
+    try {
+      if (username.trim() === 'admin' && password === '123456') {
+        onLogin({ 
+          id: 'admin',
+          role: 'admin', 
+          name: 'رئيس الاتحاد (الأدمن)',
+          apartmentNumber: 'الإدارة'
+        });
+        return;
+      }
+
+      const { data: apts, error: dbError } = await supabase
+        .from('apartments')
+        .select('*')
+        .eq('number', username.trim());
+
+      if (dbError) throw dbError;
+
+      if (!apts || apts.length === 0) {
+        setError('رقم الشقة غير مسجل في النظام');
+        setLoading(false);
+        return;
+      }
+
+      const apt = apts[0];
+      const aptPassword = apt.password || '1234';
+      
+      if (password !== aptPassword) {
+        setError('كلمة المرور غير صحيحة');
+        setLoading(false);
+        return;
+      }
+
       onLogin({ 
-        id: 'admin',
-        role: 'admin', 
-        name: 'رئيس الاتحاد (الأدمن)',
-        apartmentNumber: 'الإدارة'
-      });
-    } 
-    // حساب ساكن تجريبي (مثلاً شقة 101)
-    else if (username === '101' && password === '101') {
-      onLogin({ 
-        id: 'resident_101',
+        id: apt.id,
         role: 'resident', 
-        name: 'أحمد محمد', 
-        apartmentNumber: '101' 
+        name: apt.owner || `شقة ${apt.number}`, 
+        apartmentNumber: apt.number,
+        apartment: apt.number,
+        aptId: apt.id
       });
-    } 
-    else {
-      setError('اسم المستخدم أو كلمة المرور غير صحيحة');
+
+    } catch (err) {
+      console.error('خطأ في تسجيل الدخول:', err.message);
+      setError('حدث خطأ أثناء الاتصال بقاعدة البيانات السحابية');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden font-sans" dir="rtl">
-      {/* تأثيرات الإضاءة الجمالية الخلفية (فخم ومتناسق مع هوية Gold & Slate) */}
       <div className="absolute top-1/4 -right-20 w-80 h-80 bg-amber-500/10 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-1/4 -left-20 w-80 h-80 bg-slate-800/40 rounded-full blur-[100px] pointer-events-none" />
 
-      <div className="bg-slate-900/90 backdrop-blur-2xl border border-slate-800/90 w-full max-w-md rounded-3xl p-6 md:p-8 shadow-2xl shadow-black/60 space-y-6 relative z-10">
+      <div className="bg-slate-900/95 backdrop-blur-2xl border border-slate-800/90 w-full max-w-md rounded-3xl p-6 md:p-8 shadow-2xl shadow-black/60 space-y-6 relative z-10">
         
-        {/* الشعار والهوية البصرية */}
         <div className="text-center space-y-3">
           <div className="inline-block relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-amber-500 to-amber-300 rounded-2xl blur opacity-30 group-hover:opacity-75 transition duration-500"></div>
             <img 
               src={logoImage} 
               alt="شعار اتحاد الملاك" 
-              className="w-16 h-16 rounded-2xl mx-auto border-2 border-amber-500/50 shadow-lg relative object-cover" 
+              className="w-16 h-16 rounded-2xl mx-auto border-2 border-amber-500/50 shadow-lg relative object-cover bg-slate-900" 
             />
           </div>
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight">إتحاد ملاك البرج</h1>
-            <p className="text-xs text-amber-400 font-medium mt-1">سجل الدخول للمتابعة إلى لوحة التحكم</p>
+            <p className="text-xs text-amber-400 font-medium mt-1">سجل الدخول برقم الشقة وكلمة المرور</p>
           </div>
         </div>
 
-        {/* خطأ تسجيل الدخول */}
         {error && (
-          <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 p-3 rounded-xl text-xs flex items-center gap-2 animate-shake">
+          <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 p-3 rounded-xl text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        {/* نموذج تسجيل الدخول */}
         <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
           <div>
-            <label className="block text-slate-300 mb-1.5 font-medium">اسم المستخدم أو رقم الشقة</label>
+            <label className="block text-slate-300 mb-1.5 font-medium">رقم الشقة أو اسم المستخدم</label>
             <div className="relative">
               <User className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5" />
               <input
@@ -109,17 +134,17 @@ export default function Login({ onLogin }) {
 
           <button
             type="submit"
-            className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3.5 rounded-xl transition-all shadow-lg shadow-amber-500/20 text-xs mt-2 active:scale-[0.98]"
+            disabled={loading}
+            className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3.5 rounded-xl transition-all shadow-lg shadow-amber-500/20 text-xs mt-2 active:scale-[0.98] disabled:opacity-50"
           >
-            تسجيل الدخول
+            {loading ? 'جاري التحقق...' : 'تسجيل الدخول'}
           </button>
         </form>
 
-        {/* تلميح للحسابات التجريبية */}
         <div className="bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800/80 space-y-1.5 text-[11px] text-slate-400">
-          <span className="font-bold text-amber-400 block">حسابات تجريبية للتجربة الفورية:</span>
-          <p>👑 <b>الأدمن:</b> اسم المستخدم <code className="text-white bg-slate-900 px-1.5 py-0.5 rounded font-mono">admin</code> | كلمة المرور <code className="text-white bg-slate-900 px-1.5 py-0.5 rounded font-mono">123456</code></p>
-          <p>🏠 <b>الساكن:</b> اسم المستخدم <code className="text-white bg-slate-900 px-1.5 py-0.5 rounded font-mono">101</code> | كلمة المرور <code className="text-white bg-slate-900 px-1.5 py-0.5 rounded font-mono">101</code></p>
+          <span className="font-bold text-amber-400 block">معلومات الدخول:</span>
+          <p>👑 <b>الأدمن:</b> <code className="text-white bg-slate-900 px-1.5 py-0.5 rounded font-mono">admin</code> | كلمة المرور: <code className="text-white bg-slate-900 px-1.5 py-0.5 rounded font-mono">123456</code></p>
+          <p>🏠 <b>الساكن:</b> أدخل رقم شقتك المسجل | كلمة المرور الافتراضية: <code className="text-white bg-slate-900 px-1.5 py-0.5 rounded font-mono">1234</code></p>
         </div>
 
       </div>
