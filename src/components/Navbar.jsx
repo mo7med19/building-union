@@ -7,7 +7,8 @@ import {
   Vote, 
   Wrench, 
   BookOpen,
-  Settings
+  Settings,
+  User
 } from 'lucide-react';
 import logoImage from '../assets/logo.png';
 
@@ -20,6 +21,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin }) {
     { id: 'maintenance', label: 'الصيانة', icon: Wrench },
     { id: 'directory', label: 'السكان', icon: Users },
     { id: 'guidelines', label: 'اللائحة', icon: BookOpen },
+    { id: 'profile', label: 'حسابي', icon: User },
     ...(isAdmin ? [{ id: 'admin-settings', label: 'إدارة البرج', icon: Settings }] : [])
   ];
 
@@ -27,7 +29,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin }) {
     <>
       {/* 1. الشريط العلوي للشاشات الكبيرة (Desktop Header) */}
       <header className="hidden md:block bg-slate-900/95 backdrop-blur-md text-white shadow-lg sticky top-0 z-40 border-b border-slate-800">
-        <div className="max-w-5xl mx-auto px-4 py-2 flex justify-between items-center">
+        <div className="max-w-6xl mx-auto px-4 py-2 flex justify-between items-center">
           <div className="flex items-center gap-2.5">
             <img 
               src={logoImage} 
@@ -42,7 +44,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin }) {
             </div>
           </div>
 
-          <nav className="flex items-center gap-1 bg-slate-800/80 p-1 rounded-2xl border border-slate-700/60">
+          <nav className="flex items-center gap-1 bg-slate-800/80 p-1 rounded-2xl border border-slate-700/60 overflow-x-auto no-scrollbar">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -50,7 +52,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin }) {
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 shrink-0 ${
                     isActive 
                       ? 'bg-amber-500 text-slate-950 shadow-sm' 
                       : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
@@ -92,7 +94,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin }) {
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`flex flex-col items-center justify-center min-w-[58px] flex-1 py-1.5 px-1 rounded-xl transition-all duration-300 shrink-0 ${
+                className={`flex flex-col items-center justify-center min-w-[52px] flex-1 py-1.5 px-1 rounded-xl transition-all duration-300 shrink-0 ${
                   isActive 
                     ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20 scale-105' 
                     : 'text-slate-400 hover:text-slate-200'

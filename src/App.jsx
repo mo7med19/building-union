@@ -9,8 +9,9 @@ import Maintenance from './components/Maintenance';
 import Directory from './components/Directory';
 import Guidelines from './components/Guidelines';
 import AdminSettings from './components/AdminSettings';
+import Profile from './components/Profile';
 import { initialApartments, initialExpenses, initialPolls } from './data/mockData';
-import { LogOut, Bell, Printer, Calculator, X } from 'lucide-react';
+import { LogOut, Bell, Calculator, X } from 'lucide-react';
 
 export default function App() {
   // التحقق من حالة تسجيل الدخول المخزنة
@@ -94,13 +95,21 @@ export default function App() {
   const togglePayment = (id) => {
     if (!isAdmin) return;
     setApartments(apartments.map(apt => 
-      apt.id === id ? { ...apt, paid: !apt.paid } : apt
+      apt.id === id ? { ...apt, paid: !apt.paid, receiptUrl: null, status: 'paid' } : apt
     ));
   };
 
   const addApartment = (newApt) => {
     if (!isAdmin) return;
     setApartments(prev => [...prev, newApt]);
+  };
+
+  // دالة تحديث الإيصال للشقة عند رفعه من الساكن
+  const updateApartmentReceipt = (aptId, receiptUrl, status) => {
+    setApartments(apartments.map(apt => 
+      apt.id === aptId ? { ...apt, receiptUrl, status } : apt
+    ));
+    addNotification(`تم رفع إيصال سداد جديد للشقة رقم ${aptId}`);
   };
 
   const addExpense = (newExp) => {
@@ -138,10 +147,6 @@ export default function App() {
     ));
   };
 
-  const handlePrintReport = () => {
-    window.print();
-  };
-
   // العمليات الحسابية
   const monthlyFee = 200;
   const totalCollected = apartments.filter(a => a.paid).length * monthlyFee;
@@ -173,15 +178,6 @@ export default function App() {
             title="حاسبة رسوم المساحة"
           >
             <Calculator className="w-3.5 h-3.5" />
-          </button>
-
-          {/* طباعة التقرير */}
-          <button
-            onClick={handlePrintReport}
-            className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition"
-            title="طباعة التقرير المالي"
-          >
-            <Printer className="w-3.5 h-3.5" />
           </button>
 
           {/* الإشعارات */}
@@ -285,6 +281,7 @@ export default function App() {
             addApartment={addApartment}
             isAdmin={isAdmin}
             currentUser={user}
+            updateApartmentReceipt={updateApartmentReceipt}
           />
         )}
 
@@ -320,6 +317,14 @@ export default function App() {
 
         {activeTab === 'guidelines' && (
           <Guidelines />
+        )}
+
+        {activeTab === 'profile' && (
+          <Profile 
+            user={user} 
+            onUpdateUser={(updatedUser) => setUser(updatedUser)} 
+            onLogout={() => setUser(null)} 
+          />
         )}
 
         {activeTab === 'admin-settings' && isAdmin && (

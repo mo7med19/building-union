@@ -6,15 +6,16 @@ import {
   Bell, 
   PlusCircle, 
   Trash2, 
-  ArrowLeft, 
   CreditCard, 
   Receipt,
   CheckCircle,
   XCircle,
+  Clock,
   Wrench,
   Vote,
-  ShieldAlert
+  Upload
 } from 'lucide-react';
+import AuditLog from './AuditLog';
 
 export default function Dashboard({ 
   netBalance = 0, 
@@ -22,7 +23,10 @@ export default function Dashboard({
   totalPending = 0, 
   totalSpent = 0,
   setActiveTab,
-  isAdmin
+  isAdmin,
+  currentUser,
+  apartments = [], // استقبال قائمة الشقق لمعرفة موقف الساكن
+  auditLogs = []
 }) {
   const [announcements, setAnnouncements] = useState([
     {
@@ -34,6 +38,11 @@ export default function Dashboard({
 
   const [newAnnouncement, setNewAnnouncement] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // تحديد شقة الساكن الحالي ديناميكياً
+  const myApartment = apartments.find(
+    (apt) => apt.number === currentUser?.apartment || apt.id === currentUser?.aptId
+  ) || apartments[0];
 
   const totalTarget = totalCollected + totalPending;
   const collectionPercentage = totalTarget > 0 ? Math.round((totalCollected / totalTarget) * 100) : 0;
@@ -58,18 +67,23 @@ export default function Dashboard({
   };
 
   // ---------------------------------------------------------------------------
-  // 1. الرئيسية الخاصة بالساكن (Resident View)
+  // 1. الرئيسية الخاصة بالساكن (Resident View) - ديناميكية وواقعية
   // ---------------------------------------------------------------------------
   if (!isAdmin) {
+    const isPaid = myApartment?.paid;
+    const isPending = myApartment?.status === 'pending_review';
+
     return (
-      <div className="space-y-5">
-        {/* كارت مرحباً والموقف المالي الشخصي */}
+      <div className="space-y-5" dir="rtl">
+        {/* كارت موقف الساكن الديناميكي */}
         <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-6 rounded-2xl shadow-lg border border-slate-700/80 relative overflow-hidden">
           <div className="absolute -left-10 -bottom-10 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
 
           <div className="flex justify-between items-start relative z-10">
             <div>
-              <span className="text-xs text-amber-400 font-bold block mb-1">مرحباً بك في برجك السكني</span>
+              <span className="text-xs text-amber-400 font-bold block mb-1">
+                مرحباً بك ({myApartment?.number || 'الساكن'})
+              </span>
               <h2 className="text-xl md:text-2xl font-black text-white">موقفي المالي لهذا الشهر</h2>
             </div>
             <div className="bg-amber-500/20 p-2.5 rounded-2xl border border-amber-500/30">
@@ -77,16 +91,35 @@ export default function Dashboard({
             </div>
           </div>
 
-          <div className="mt-5 pt-4 border-t border-slate-700/60 flex items-center justify-between relative z-10">
+          <div className="mt-5 pt-4 border-t border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
             <div>
               <span className="text-[11px] text-slate-400 block">اشتراك الصيانة والخدمات</span>
               <span className="text-lg font-black text-white font-mono">200 ج.م</span>
             </div>
 
+            {/* عرض الحالة الحقيقية للساكن */}
             <div>
-              <span className="bg-emerald-500/20 text-emerald-400 text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1.5 border border-emerald-500/30">
-                <CheckCircle className="w-4 h-4" /> مسدد لهذا الشهر
-              </span>
+              {isPaid ? (
+                <span className="bg-emerald-500/20 text-emerald-400 text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1.5 border border-emerald-500/30">
+                  <CheckCircle className="w-4 h-4" /> مسدد لهذا الشهر
+                </span>
+              ) : isPending ? (
+                <span className="bg-amber-500/20 text-amber-300 text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1.5 border border-amber-500/30">
+                  <Clock className="w-4 h-4" /> بانتظار اعتماد الإدارة
+                </span>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="bg-rose-500/20 text-rose-300 text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1.5 border border-rose-500/30">
+                    <XCircle className="w-4 h-4" /> غير مسدد (مستحق)
+                  </span>
+                  <button
+                    onClick={() => setActiveTab('finance')}
+                    className="bg-amber-500 hover:bg-amber-600 text-slate-900 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 transition shadow-sm"
+                  >
+                    <Upload className="w-3.5 h-3.5" /> سدد الآن
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -157,11 +190,11 @@ export default function Dashboard({
   }
 
   // ---------------------------------------------------------------------------
-  // 2. الرئيسية الخاصة بالمالك والأدمن (Admin Dashboard View)
+  // 2. الرئيسية الخاصة بالمالك والأدمن (Admin View)
   // ---------------------------------------------------------------------------
   return (
-    <div className="space-y-5">
-      {/* 1. كارت الرصيد والتحليلات الإدارية */}
+    <div className="space-y-5" dir="rtl">
+      {/* كارت الرصيد والتحليلات */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-6 rounded-2xl shadow-lg border border-slate-700/80 relative overflow-hidden">
         <div className="absolute -left-10 -bottom-10 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
 
@@ -191,7 +224,7 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* 2. الكروت الإحصائية الإدارية */}
+      {/* الإحصائيات الإدارية */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
           <span className="text-xs text-slate-500 font-medium">المحصل هذا الشهر</span>
@@ -230,7 +263,10 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* 3. الإعلانات والتحكم بها للأدمن */}
+      {/* سجل النشاطات */}
+      <AuditLog logs={auditLogs} />
+
+      {/* الإعلانات والتنبيهات */}
       <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
