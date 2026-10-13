@@ -16,7 +16,10 @@ export default function Login({ onLogin }) {
     setLoading(true);
 
     try {
-      if (username.trim() === 'admin' && password === '123456') {
+      const trimmedInput = username.trim();
+
+      // التحقق من حساب الأدمن
+      if (trimmedInput === 'admin' && password === '123456') {
         onLogin({ 
           id: 'admin',
           role: 'admin', 
@@ -26,20 +29,34 @@ export default function Login({ onLogin }) {
         return;
       }
 
+      // جلب جميع الشقق لمطابقة رقم الشقة بمرونة (سواء كتب المستخدم رقم فقط أو كلمة شقة مع الرقم)
       const { data: apts, error: dbError } = await supabase
         .from('apartments')
-        .select('*')
-        .eq('number', username.trim());
+        .select('*');
 
       if (dbError) throw dbError;
 
       if (!apts || apts.length === 0) {
+        setError('لا توجد شقق مسجلة في النظام حالياً');
+        setLoading(false);
+        return;
+      }
+
+      // تنظيف المدخلات وتوحيدها للبحث المرن
+      const cleanInput = trimmedInput.replace(/^شقة\s*/, '').trim();
+
+      const apt = apts.find(a => {
+        if (!a.number) return false;
+        const cleanDbNumber = String(a.number).replace(/^شقة\s*/, '').trim();
+        return cleanDbNumber === cleanInput;
+      });
+
+      if (!apt) {
         setError('رقم الشقة غير مسجل في النظام');
         setLoading(false);
         return;
       }
 
-      const apt = apts[0];
       const aptPassword = apt.password || '1234';
       
       if (password !== aptPassword) {
@@ -144,7 +161,7 @@ export default function Login({ onLogin }) {
         <div className="bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800/80 space-y-1.5 text-[11px] text-slate-400">
           <span className="font-bold text-amber-400 block">معلومات الدخول:</span>
           <p>👑 <b>الأدمن:</b> <code className="text-white bg-slate-900 px-1.5 py-0.5 rounded font-mono">admin</code> | كلمة المرور: <code className="text-white bg-slate-900 px-1.5 py-0.5 rounded font-mono">123456</code></p>
-          <p>🏠 <b>الساكن:</b> أدخل رقم شقتك المسجل | كلمة المرور الافتراضية: <code className="text-white bg-slate-900 px-1.5 py-0.5 rounded font-mono">1234</code></p>
+          <p>🏠 <b>الساكن:</b> أدخل رقم شقتك المسجل | كلمة المرور الافتراضية: <code className="text-white bg-slate-900 px-1.5 py-0.5 rounded font-mono">123</code></p>
         </div>
 
       </div>

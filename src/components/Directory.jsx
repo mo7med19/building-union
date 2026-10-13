@@ -42,8 +42,8 @@ export default function Directory({ apartments = [], addApartment, updateApartme
   const filteredApartments = apartments.filter((apt) => {
     const search = searchTerm.toLowerCase();
     return (
-      apt.number.toLowerCase().includes(search) ||
-      apt.owner.toLowerCase().includes(search) ||
+      (apt.number && apt.number.toLowerCase().includes(search)) ||
+      (apt.owner && apt.owner.toLowerCase().includes(search)) ||
       (apt.phone && apt.phone.includes(search)) ||
       (apt.tenantName && apt.tenantName.toLowerCase().includes(search))
     );
@@ -60,17 +60,16 @@ export default function Directory({ apartments = [], addApartment, updateApartme
     if (!newNumber || !newOwner) return;
 
     if (addApartment) {
+      // إرسال البيانات بدون تحديد id يدوياً لكي تقوم القاعدة بتوليده تلقائياً
       addApartment({
-        id: Date.now(),
         number: newNumber.startsWith('شقة') ? newNumber : `شقة ${newNumber}`,
         owner: newOwner,
         phone: newPhone || '01000000000',
-        occupancyType: isRental ? 'إيجار' : 'ملكية خاصة',
-        tenantName: isRental ? newTenantName : '',
-        tenantPhone: isRental ? newTenantPhone : '',
+        notes: isRental ? `مؤجرة - المستأجر: ${newTenantName || 'غير متوفر'} (${newTenantPhone || ''})` : 'ملكية خاصة',
         paid: false,
-        receiptUrl: null,
-        status: 'unpaid'
+        receipt_url: null,
+        status: 'unpaid',
+        password: '123'
       });
     }
 
@@ -86,7 +85,7 @@ export default function Directory({ apartments = [], addApartment, updateApartme
   const handleEditSubmit = (e) => {
     e.preventDefault();
     if (!editingApartment) return;
-    if (updateApartment) updateApartment(editingApartment);
+    if (updateApartment) updateApartment(editingApartment.id, editingApartment);
     setEditingApartment(null);
   };
 
@@ -176,12 +175,12 @@ export default function Directory({ apartments = [], addApartment, updateApartme
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-extrabold text-sm text-slate-900">{apt.number}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${apt.occupancyType === 'إيجار' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-slate-100 text-slate-600'}`}>
-                        {apt.occupancyType || 'ملكية خاصة'}
+                      <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-slate-100 text-slate-600">
+                        {apt.notes || 'ملكية خاصة'}
                       </span>
                     </div>
                     <h3 className="text-xs font-semibold text-slate-700 mt-1">
-                      المالك: {apt.owner} {apt.tenantName ? `(المستأجر: ${apt.tenantName})` : ''}
+                      المالك: {apt.owner}
                     </h3>
                   </div>
 

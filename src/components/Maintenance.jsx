@@ -7,7 +7,6 @@ export default function Maintenance({ maintenanceList, addMaintenance, updateSta
   const [apartment, setApartment] = useState('');
   const [description, setDescription] = useState('');
 
-  // حماية ضد أي قيم فارغة أو قيد التحميل
   const list = maintenanceList || [];
 
   const handleSubmit = (e) => {
@@ -15,13 +14,12 @@ export default function Maintenance({ maintenanceList, addMaintenance, updateSta
     if (!title || !apartment) return;
 
     if (addMaintenance) {
+      // إرسال البيانات بدون id يدوياً لكي تتولى قاعدة البيانات توليده تلقائياً
       addMaintenance({
-        id: Date.now(),
         title,
         apartment,
         description,
-        status: 'pending',
-        date: new Date().toISOString().split('T')[0],
+        status: 'pending'
       });
     }
 
@@ -86,7 +84,6 @@ export default function Maintenance({ maintenanceList, addMaintenance, updateSta
                 </div>
               </div>
 
-              {/* أزرار تغيير حالة العطل تظهر للأدمن فقط */}
               {isAdmin && (
                 <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
                   <span className="text-slate-400 font-mono text-[10px]">{item.date}</span>
@@ -111,7 +108,6 @@ export default function Maintenance({ maintenanceList, addMaintenance, updateSta
         )}
       </div>
 
-      {/* Modal إضافة طلب عطل لكل المستخدمين */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-2xl p-5 shadow-xl space-y-4">
