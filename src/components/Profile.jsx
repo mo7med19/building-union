@@ -8,17 +8,19 @@ import {
   ShieldCheck, 
   Save, 
   CheckCircle2, 
+  AlertCircle,
   Eye, 
   EyeOff, 
   LogOut 
 } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 export default function Profile({ user, onUpdateUser, onLogout }) {
   const [formData, setFormData] = useState({
     name: user?.name || '',
-    phone: user?.phone || '0590000000',
+    phone: user?.phone || '',
     email: user?.email || '',
-    apartmentNumber: user?.apartmentNumber || '',
+    apartmentNumber: user?.number || user?.apartmentNumber || '',
   });
 
   const [passwords, setPasswords] = useState({
@@ -31,24 +33,53 @@ export default function Profile({ user, onUpdateUser, onLogout }) {
   const [showNewPass, setShowNewPass] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [loadingPassword, setLoadingPassword] = useState(false);
 
-  const handleProfileSubmit = (e) => {
+  // تحديث البيانات الشخصية وحفظها في Supabase
+  const handleProfileSubmit = async (e) => {
     e.preventDefault();
     setSuccessMessage('');
     setErrorMessage('');
+    setLoadingProfile(true);
 
-    if (onUpdateUser) {
-      onUpdateUser({
+    try {
+      // إذا كان المستخدم شقة مسجلة في جدول apartments
+      if (user?.id) {
+        const { error } = await supabase
+          .from('apartments')
+          .update({
+            owner: formData.name,
+            phone: formData.phone,
+            notes: formData.email ? `بريد: ${formData.email}` : undefined
+          })
+          .eq('id', user.id);
+
+        if (error) throw error;
+      }
+
+      const updatedUserData = {
         ...user,
-        ...formData,
-      });
-    }
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email,
+      };
 
-    setSuccessMessage('تم حفظ بيانات الملف الشخصي بنجاح');
-    setTimeout(() => setSuccessMessage(''), 3000);
+      if (onUpdateUser) {
+        onUpdateUser(updatedUserData);
+      }
+
+      setSuccessMessage('تم حفظ وتحديث بيانات الملف الشخصي سحابياً بنجاح');
+      setTimeout(() => setSuccessMessage(''), 4000);
+    } catch (error) {
+      setErrorMessage('فشل تحديث البيانات: ' + error.message);
+    } finally {
+      setLoadingProfile(false);
+    }
   };
 
-  const handlePasswordSubmit = (e) => {
+  // تحديث كلمة المرور في قاعدة البيانات
+  const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     setSuccessMessage('');
     setErrorMessage('');
@@ -63,14 +94,45 @@ export default function Profile({ user, onUpdateUser, onLogout }) {
       return;
     }
 
-    if (passwords.newPassword.length < 6) {
-      setErrorMessage('يجب أن تتكون كلمة المرور من 6 أحرف على الأقل');
+    if (passwords.newPassword.length < 4) {
+      setErrorMessage('يجب أن تتكون كلمة المرور من 4 أحرف أو أرقام على الأقل');
       return;
     }
 
-    setSuccessMessage('تم تحديث كلمة المرور بنجاح');
-    setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    setTimeout(() => setSuccessMessage(''), 3000);
+    setLoadingPassword(true);
+
+    try {
+      // التحقق من كلمة المرور الحالية للشقة
+      if (user?.id) {
+        const { data: aptData, error: fetchError } = await supabase
+          .from('apartments')
+          .select('password')
+          .eq('id', user.id)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        if (aptData && aptData.password && aptData.password !== passwords.currentPassword) {
+          throw new Error('كلمة المرور الحالية غير صحيحة');
+        }
+
+        // تحديث كلمة المرور الجديدة في السحابة
+        const { error: updateError } = await supabase
+          .from('apartments')
+          .update({ password: passwords.newPassword })
+          .eq('id', user.id);
+
+        if (updateError) throw updateError;
+      }
+
+      setSuccessMessage('تم تحديث كلمة المرور سحابياً بنجاح');
+      setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setTimeout(() => setSuccessMessage(''), 4000);
+    } catch (error) {
+      setErrorMessage(error.message || 'فشل تحديث كلمة المرور');
+    } finally {
+      setLoadingPassword(false);
+    }
   };
 
   return (
@@ -106,7 +168,7 @@ export default function Profile({ user, onUpdateUser, onLogout }) {
         {onLogout && (
           <button
             onClick={onLogout}
-            className="z-10 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2"
+            className="z-10 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
             <span>تسجيل الخروج</span>
@@ -114,7 +176,7 @@ export default function Profile({ user, onUpdateUser, onLogout }) {
         )}
       </div>
 
-      {/* رسائل التنبيه */}
+      {/* رسائل التنبيه والنجاح */}
       {successMessage && (
         <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-3.5 rounded-2xl text-xs flex items-center gap-2 animate-fade-in">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -124,7 +186,7 @@ export default function Profile({ user, onUpdateUser, onLogout }) {
 
       {errorMessage && (
         <div className="bg-rose-500/10 border border-rose-500/30 text-rose-400 p-3.5 rounded-2xl text-xs flex items-center gap-2 animate-fade-in">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{errorMessage}</span>
         </div>
       )}
@@ -140,7 +202,7 @@ export default function Profile({ user, onUpdateUser, onLogout }) {
 
           <form onSubmit={handleProfileSubmit} className="space-y-4 text-xs">
             <div>
-              <label className="block text-slate-300 mb-1.5 font-medium">الاسم الكامل</label>
+              <label className="block text-slate-300 mb-1.5 font-medium">الاسم الكامل / مالك الشقة</label>
               <div className="relative">
                 <User className="w-4 h-4 text-slate-500 absolute right-3.5 top-3.5" />
                 <input
@@ -189,19 +251,19 @@ export default function Profile({ user, onUpdateUser, onLogout }) {
                 <input
                   type="text"
                   value={formData.apartmentNumber}
-                  onChange={(e) => setFormData({ ...formData, apartmentNumber: e.target.value })}
-                  disabled={user?.role !== 'admin'}
-                  className="w-full bg-slate-950 border border-slate-800 text-white pr-10 pl-3 py-3 rounded-xl focus:outline-none focus:border-amber-500 transition disabled:opacity-60 disabled:cursor-not-allowed font-mono"
+                  disabled
+                  className="w-full bg-slate-950 border border-slate-800 text-white pr-10 pl-3 py-3 rounded-xl opacity-60 cursor-not-allowed font-mono"
                 />
               </div>
             </div>
 
             <button
               type="submit"
-              className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 rounded-xl transition shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2 mt-2"
+              disabled={loadingProfile}
+              className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 rounded-xl transition shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2 mt-2 cursor-pointer"
             >
               <Save className="w-4 h-4" />
-              <span>حفظ البيانات</span>
+              <span>{loadingProfile ? 'جاري الحفظ...' : 'حفظ البيانات'}</span>
             </button>
           </form>
         </div>
@@ -224,11 +286,12 @@ export default function Profile({ user, onUpdateUser, onLogout }) {
                   onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 text-white pr-10 pl-10 py-3 rounded-xl focus:outline-none focus:border-amber-500 transition"
                   placeholder="••••••••"
+                  required
                 />
                 <button
                   type="button"
                   onClick={() => setShowCurrentPass(!showCurrentPass)}
-                  className="absolute left-3 top-3.5 text-slate-500 hover:text-slate-300"
+                  className="absolute left-3 top-3.5 text-slate-500 hover:text-slate-300 cursor-pointer"
                 >
                   {showCurrentPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -245,11 +308,12 @@ export default function Profile({ user, onUpdateUser, onLogout }) {
                   onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 text-white pr-10 pl-10 py-3 rounded-xl focus:outline-none focus:border-amber-500 transition"
                   placeholder="••••••••"
+                  required
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPass(!showNewPass)}
-                  className="absolute left-3 top-3.5 text-slate-500 hover:text-slate-300"
+                  className="absolute left-3 top-3.5 text-slate-500 hover:text-slate-300 cursor-pointer"
                 >
                   {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -266,16 +330,18 @@ export default function Profile({ user, onUpdateUser, onLogout }) {
                   onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 text-white pr-10 pl-3 py-3 rounded-xl focus:outline-none focus:border-amber-500 transition"
                   placeholder="••••••••"
+                  required
                 />
               </div>
             </div>
 
             <button
               type="submit"
-              className="w-full bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 mt-2"
+              disabled={loadingPassword}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 mt-2 cursor-pointer"
             >
               <KeyRound className="w-4 h-4" />
-              <span>تحديث كلمة المرور</span>
+              <span>{loadingPassword ? 'جاري التحديث...' : 'تحديث كلمة المرور'}</span>
             </button>
           </form>
         </div>

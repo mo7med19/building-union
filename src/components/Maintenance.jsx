@@ -1,20 +1,25 @@
-import React, { useState } from 'react';
-import { Wrench, PlusCircle, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Wrench, PlusCircle, CheckCircle2, Clock, AlertTriangle, Trash2, Filter } from 'lucide-react';
 
-export default function Maintenance({ maintenanceList, addMaintenance, updateStatus, isAdmin }) {
+export default function Maintenance({ maintenanceList = [], addMaintenance, updateStatus, deleteMaintenance, isAdmin }) {
   const [showModal, setShowModal] = useState(false);
   const [title, setTitle] = useState('');
   const [apartment, setApartment] = useState('');
   const [description, setDescription] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const list = maintenanceList || [];
+
+  const filteredList = useMemo(() => {
+    if (statusFilter === 'all') return list;
+    return list.filter(item => item.status === statusFilter);
+  }, [list, statusFilter]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!title || !apartment) return;
 
     if (addMaintenance) {
-      // إرسال البيانات بدون id يدوياً لكي تتولى قاعدة البيانات توليده تلقائياً
       addMaintenance({
         title,
         apartment,
@@ -29,9 +34,17 @@ export default function Maintenance({ maintenanceList, addMaintenance, updateSta
     setShowModal(false);
   };
 
+  const handleDelete = (id) => {
+    if (confirm('هل أنت متأكد من حذف هذا البلاغ نهائياً؟')) {
+      if (deleteMaintenance) {
+        deleteMaintenance(id);
+      }
+    }
+  };
+
   return (
     <div className="space-y-4" dir="rtl">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <Wrench className="w-5 h-5 text-amber-500" /> طلبات الأعطال والصيانة
@@ -40,19 +53,44 @@ export default function Maintenance({ maintenanceList, addMaintenance, updateSta
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition"
+          className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
         >
           <PlusCircle className="w-4 h-4" /> طلب عطل جديد
         </button>
       </div>
 
+      {/* فلاتر حالات الصيانة */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+        <span className="text-slate-500 flex items-center gap-1 shrink-0 font-medium">
+          <Filter className="w-3.5 h-3.5" /> تصفية حسب الحالة:
+        </span>
+        {[
+          { id: 'all', label: 'الكل' },
+          { id: 'pending', label: 'قيد الانتظار' },
+          { id: 'in-progress', label: 'قيد العمل' },
+          { id: 'completed', label: 'تم الإصلاح' }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setStatusFilter(tab.id)}
+            className={`px-3 py-1.5 rounded-xl font-medium transition shrink-0 cursor-pointer ${
+              statusFilter === tab.id
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <div className="space-y-3">
-        {list.length === 0 ? (
+        {filteredList.length === 0 ? (
           <div className="bg-white p-8 rounded-2xl border border-slate-200/80 text-center text-slate-400 text-xs">
-            لا توجد طلبات صيانة مسجلة حالياً
+            لا توجد طلبات صيانة مسجلة ضمن هذا التصنيف حالياً
           </div>
         ) : (
-          list.map((item) => (
+          filteredList.map((item) => (
             <div key={item.id} className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
               <div className="flex justify-between items-start">
                 <div>
@@ -65,7 +103,7 @@ export default function Maintenance({ maintenanceList, addMaintenance, updateSta
                   <p className="text-xs text-slate-600 mt-1">{item.description || 'بدون تفاصيل إضافية'}</p>
                 </div>
 
-                <div>
+                <div className="flex items-center gap-2">
                   {item.status === 'completed' && (
                     <span className="bg-emerald-50 text-emerald-700 text-[11px] px-2.5 py-1 rounded-full font-bold flex items-center gap-1 border border-emerald-200/60">
                       <CheckCircle2 className="w-3.5 h-3.5" /> تم الإصلاح
@@ -81,6 +119,16 @@ export default function Maintenance({ maintenanceList, addMaintenance, updateSta
                       <AlertTriangle className="w-3.5 h-3.5" /> قيد الانتظار
                     </span>
                   )}
+
+                  {isAdmin && deleteMaintenance && (
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                      title="حذف البلاغ"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -90,13 +138,13 @@ export default function Maintenance({ maintenanceList, addMaintenance, updateSta
                   <div className="flex gap-1.5">
                     <button
                       onClick={() => updateStatus && updateStatus(item.id, 'in-progress')}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg transition"
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg transition cursor-pointer"
                     >
                       قيد العمل
                     </button>
                     <button
                       onClick={() => updateStatus && updateStatus(item.id, 'completed')}
-                      className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-lg transition font-bold"
+                      className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-lg transition font-bold cursor-pointer"
                     >
                       إتمام الإصلاح
                     </button>
@@ -152,14 +200,14 @@ export default function Maintenance({ maintenanceList, addMaintenance, updateSta
               <div className="flex gap-2 pt-2">
                 <button
                   type="submit"
-                  className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2.5 rounded-xl transition"
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2.5 rounded-xl transition cursor-pointer"
                 >
                   إرسال البلاغ
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 rounded-xl transition"
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 rounded-xl transition cursor-pointer"
                 >
                   إلغاء
                 </button>

@@ -13,10 +13,11 @@ import {
   Printer,
   Download,
   Wrench,
-  ChevronDown
+  ChevronDown,
+  Trash2
 } from 'lucide-react';
 
-export default function Finance({ apartments, togglePayment, isAdmin, currentUser, updateApartmentReceipt, addNotification }) {
+export default function Finance({ apartments, togglePayment, isAdmin, currentUser, updateApartmentReceipt, updateApartmentExtraFees, addNotification }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
 
@@ -25,14 +26,15 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
   const [previewImage, setPreviewImage] = useState(null);
   const [activeReceiptView, setActiveReceiptView] = useState(null);
 
-  // حالات Modal إضافة بند صيانة إضافي (للأدمن)
+  // حالات Modal إضافة بند صيانة إضافي (للأدمن مع خيار التوزيع أو التخصيص لشقة واحدة)
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [emergencyTitle, setEmergencyTitle] = useState('مبلغ صيانة إضافي');
-  const [emergencyTotalCost, setEmergencyTotalCost] = useState('');
+  const [emergencyCost, setEmergencyCost] = useState('');
+  const [distributionType, setDistributionType] = useState('all'); // 'all' أو 'single'
+  const [targetApartmentId, setTargetApartmentId] = useState('');
 
   const monthlyFee = 200; // اشتراك الصيانة الأساسي
 
-  // تم تصحيح هذا السطر: لن يتم عرض أي شقة وهمية إذا كانت القاعدة فارغة
   const myApartment = (apartments || []).find(
     (apt) => apt.number === currentUser?.apartment || apt.id === currentUser?.aptId || apt.owner === currentUser?.name
   );
@@ -51,9 +53,9 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
   const paidCount = (apartments || []).filter(a => a.paid).length;
   const unpaidCount = totalCount - paidCount;
 
-  // حساب حصة كل شقة من بند الصيانة الإضافي
-  const calculatedSharePerApartment = emergencyTotalCost && totalCount > 0 
-    ? Math.ceil(parseFloat(emergencyTotalCost) / totalCount) 
+  // حساب حصة الشقة الواحدة في حال اختيار التوزيع على الكل
+  const calculatedSharePerApartment = emergencyCost && totalCount > 0 && distributionType === 'all'
+    ? Math.ceil(parseFloat(emergencyCost) / totalCount) 
     : 0;
 
   const handleFileUpload = (e) => {
@@ -75,26 +77,75 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
     setPreviewImage(null);
   };
 
-  const handleEmergencySubmit = (e) => {
+  const handleEmergencySubmit = async (e) => {
     e.preventDefault();
-    if (!emergencyTitle || !emergencyTotalCost) return;
+    if (!emergencyTitle || !emergencyCost) return;
 
-    const share = calculatedSharePerApartment;
-    
-    if (addNotification) {
-      addNotification(`🔧 مطالبة مالية: ${emergencyTitle} | المطلوب من كل شقة: ${share} ج.م`);
+    const costNum = parseFloat(emergencyCost);
+
+    if (distributionType === 'all') {
+      const share = calculatedSharePerApartment;
+      
+      if (addNotification) {
+        addNotification(`🔧 مطالبة مالية: ${emergencyTitle} | المطلوب من كل شقة: ${share} ج.م`);
+      }
+
+      // تحديث كل شقة وحفظ البند في السحابة
+      for (const apt of (apartments || [])) {
+        const existingFees = apt.extraFees || [];
+        const updatedFees = [...existingFees, { title: emergencyTitle, amount: share }];
+        
+        if (updateApartmentExtraFees) {
+          await updateApartmentExtraFees(apt.id, updatedFees);
+        }
+      }
+
+      alert(`تم تسجيل "${emergencyTitle}" وتوزيع مبلغ ${share} ج.م وحفظه سحابياً على كافة الشقق بنجاح.`);
+    } else {
+      if (!targetApartmentId) {
+        alert('يرجى اختيار الشقة المراد تحميل المبلغ عليها.');
+        return;
+      }
+
+      const targetApt = (apartments || []).find(a => a.id.toString() === targetApartmentId.toString());
+      if (targetApt) {
+        const existingFees = targetApt.extraFees || [];
+        const updatedFees = [...existingFees, { title: emergencyTitle, amount: costNum }];
+
+        if (updateApartmentExtraFees) {
+          await updateApartmentExtraFees(targetApt.id, updatedFees);
+        }
+
+        if (addNotification) {
+          addNotification(`🔧 مطالبة مالية لشقة (${targetApt.number}): ${emergencyTitle} بقيمة ${costNum} ج.م`);
+        }
+
+        alert(`تم إضافة المبلغ (${costNum} ج.م) وحفظه سحابياً على شقة رقم (${targetApt.number}) بنجاح.`);
+      }
     }
-
-    (apartments || []).forEach(apt => {
-      const existingFees = apt.extraFees || [];
-      apt.extraFees = [...existingFees, { title: emergencyTitle, amount: share }];
-    });
-
-    alert(`تم تسجيل "${emergencyTitle}" بنجاح وتوزيع مبلغ ${share} ج.م على الشقق.`);
     
+    // إعادة تعيين الحقول
     setEmergencyTitle('مبلغ صيانة إضافي');
-    setEmergencyTotalCost('');
+    setEmergencyCost('');
+    setDistributionType('all');
+    setTargetApartmentId('');
     setShowEmergencyModal(false);
+  };
+
+  // دالة حذف بند إضافي عن شقة معينة وحفظه سحابياً
+  const handleRemoveExtraFee = async (apartmentId, feeIndex) => {
+    if (!confirm('هل أنت متأكد من حذف هذا البند الإضافي عن الشقة؟')) return;
+
+    const targetApt = (apartments || []).find(a => a.id.toString() === apartmentId.toString());
+    if (targetApt && targetApt.extraFees) {
+      const updatedFees = [...targetApt.extraFees];
+      updatedFees.splice(feeIndex, 1);
+
+      if (updateApartmentExtraFees) {
+        await updateApartmentExtraFees(targetApt.id, updatedFees);
+      }
+      alert('تم حذف البند وحفظ التحديثات سحابياً بنجاح.');
+    }
   };
 
   const handlePrintReceipt = () => {
@@ -233,7 +284,7 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
             <div className="flex justify-end">
               <button 
                 onClick={() => setShowReceiptModal(true)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition shadow-sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition shadow-sm cursor-pointer"
               >
                 <Upload className="w-4 h-4" /> {hasReceipt ? 'تحديث إيصال السداد' : 'إرفاق إيصال السداد'}
               </button>
@@ -246,7 +297,7 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
             <div className="bg-white w-full max-w-md rounded-2xl p-5 shadow-xl space-y-4 text-xs">
               <div className="flex justify-between items-center border-b pb-2">
                 <h3 className="font-bold text-sm text-slate-900">إرفاق إيصال سداد الاشتراكات</h3>
-                <button onClick={() => setShowReceiptModal(false)}><X className="w-4 h-4 text-slate-400" /></button>
+                <button onClick={() => setShowReceiptModal(false)}><X className="w-4 h-4 text-slate-400 cursor-pointer" /></button>
               </div>
 
               <div className="space-y-3">
@@ -262,8 +313,8 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
                   </div>
                 )}
                 <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={submitReceipt} disabled={!previewImage} className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2.5 rounded-xl transition disabled:opacity-50">إرسال للإدارة</button>
-                  <button type="button" onClick={() => setShowReceiptModal(false)} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 rounded-xl transition">إلغاء</button>
+                  <button type="button" onClick={submitReceipt} disabled={!previewImage} className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2.5 rounded-xl transition disabled:opacity-50 cursor-pointer">إرسال للإدارة</button>
+                  <button type="button" onClick={() => setShowReceiptModal(false)} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 rounded-xl transition cursor-pointer">إلغاء</button>
                 </div>
               </div>
             </div>
@@ -286,7 +337,7 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
 
         <button
           onClick={() => setShowEmergencyModal(true)}
-          className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition"
+          className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
         >
           <Wrench className="w-4 h-4" /> إضافة مبلغ صيانة
         </button>
@@ -321,7 +372,7 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs text-slate-700 focus:outline-none"
+          className="bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs text-slate-700 focus:outline-none cursor-pointer"
         >
           <option value="all">جميع الشقق</option>
           <option value="paid">المسددة فقط</option>
@@ -360,9 +411,21 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
                           <span>{monthlyFee} ج.م</span>
                         </div>
                         {extraFees.map((fee, idx) => (
-                          <div key={idx} className="flex justify-between text-amber-800">
-                            <span>• {fee.title}</span>
-                            <span>{fee.amount} ج.م</span>
+                          <div key={idx} className="flex justify-between items-center text-amber-800 py-0.5 border-t border-slate-200/40">
+                            <span>• {fee.title}: <strong>{fee.amount} ج.م</strong></span>
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveExtraFee(apt.id, idx);
+                                }}
+                                className="text-rose-500 hover:text-rose-700 p-1 rounded transition cursor-pointer"
+                                title="حذف هذا البند"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -373,7 +436,7 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
                     {apt.receiptUrl ? (
                       <button
                         onClick={() => setActiveReceiptView(apt)}
-                        className="bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1 border border-blue-200 transition"
+                        className="bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1 border border-blue-200 transition cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" /> معاينة الإيصال
                       </button>
@@ -393,7 +456,7 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
 
                     <button 
                       onClick={() => togglePayment(apt.id)}
-                      className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl transition font-medium"
+                      className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl transition font-medium cursor-pointer"
                     >
                       {apt.paid ? 'إلغاء السداد' : 'اعتماد السداد'}
                     </button>
@@ -410,9 +473,9 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
           <div className="bg-white w-full max-w-md rounded-2xl p-5 shadow-xl space-y-4 text-xs">
             <div className="flex justify-between items-center border-b pb-2">
               <h3 className="font-bold text-sm text-slate-900 flex items-center gap-1.5 text-amber-600">
-                <Wrench className="w-4 h-4" /> إضافة مبلغ صيانة وتوزيع التكلفة
+                <Wrench className="w-4 h-4" /> إضافة مبلغ صيانة وتحديد طريقة التوزيع
               </h3>
-              <button onClick={() => setShowEmergencyModal(false)}><X className="w-4 h-4 text-slate-400" /></button>
+              <button onClick={() => setShowEmergencyModal(false)}><X className="w-4 h-4 text-slate-400 cursor-pointer" /></button>
             </div>
 
             <form onSubmit={handleEmergencySubmit} className="space-y-3">
@@ -428,18 +491,65 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
               </div>
 
               <div>
-                <label className="block text-slate-600 mb-1 font-medium">التكلفة الإجمالية للصيانة (ج.م)</label>
+                <label className="block text-slate-600 mb-1 font-medium">المبلغ المطلوب (ج.م)</label>
                 <input
                   type="number"
                   placeholder="مثال: 1200"
-                  value={emergencyTotalCost}
-                  onChange={(e) => setEmergencyTotalCost(e.target.value)}
+                  value={emergencyCost}
+                  onChange={(e) => setEmergencyCost(e.target.value)}
                   className="w-full border border-slate-200 p-2.5 rounded-xl focus:outline-none focus:border-amber-500 font-mono"
                   required
                 />
               </div>
 
-              {emergencyTotalCost && (
+              <div>
+                <label className="block text-slate-600 mb-1 font-medium">طريقة تطبيق المبلغ</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDistributionType('all')}
+                    className={`py-2 px-3 rounded-xl font-bold border transition cursor-pointer ${
+                      distributionType === 'all'
+                        ? 'bg-amber-50 text-amber-800 border-amber-300'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    توزيع على كل الشقق
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDistributionType('single')}
+                    className={`py-2 px-3 rounded-xl font-bold border transition cursor-pointer ${
+                      distributionType === 'single'
+                        ? 'bg-amber-50 text-amber-800 border-amber-300'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    تخصيص لشقة واحدة
+                  </button>
+                </div>
+              </div>
+
+              {distributionType === 'single' && (
+                <div>
+                  <label className="block text-slate-600 mb-1 font-medium">اختر الشقة المستهدفة</label>
+                  <select
+                    value={targetApartmentId}
+                    onChange={(e) => setTargetApartmentId(e.target.value)}
+                    className="w-full border border-slate-200 p-2.5 rounded-xl bg-white focus:outline-none focus:border-amber-500 cursor-pointer font-medium"
+                    required
+                  >
+                    <option value="">-- اختر رقم الشقة والمالك --</option>
+                    {(apartments || []).map((apt) => (
+                      <option key={apt.id} value={apt.id}>
+                        شقة رقم {apt.number} ({apt.owner})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {emergencyCost && distributionType === 'all' && (
                 <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-center space-y-1">
                   <span className="text-[11px] text-amber-800 block">عدد شقق البرج: <b>{totalCount} شقق</b></span>
                   <span className="text-xs text-slate-700 block">المبلغ المضاف على كل شقة:</span>
@@ -449,19 +559,17 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
                 </div>
               )}
 
-              <p className="text-[11px] text-slate-500">سيتم إضافة هذا البند كجزء من قائمة المبالغ المستحقة لكل شقة مع إشعار فور تعميمه.</p>
-
               <div className="flex gap-2 pt-2">
                 <button
                   type="submit"
-                  className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2.5 rounded-xl transition"
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2.5 rounded-xl transition cursor-pointer"
                 >
-                  تعميم البند وتحديث القوائم
+                  حفظ وتطبيق المبلغ
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowEmergencyModal(false)}
-                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 rounded-xl transition"
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 rounded-xl transition cursor-pointer"
                 >
                   إلغاء
                 </button>
@@ -479,7 +587,7 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
                 <h3 className="font-bold text-sm text-slate-900">إيصال سداد شقة {activeReceiptView.number}</h3>
                 <span className="text-slate-500">المالك: {activeReceiptView.owner}</span>
               </div>
-              <button onClick={() => setActiveReceiptView(null)}><X className="w-4 h-4 text-slate-400" /></button>
+              <button onClick={() => setActiveReceiptView(null)}><X className="w-4 h-4 text-slate-400 cursor-pointer" /></button>
             </div>
 
             <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 max-h-96 flex items-center justify-center p-2">
@@ -487,9 +595,9 @@ export default function Finance({ apartments, togglePayment, isAdmin, currentUse
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2">
-              <button type="button" onClick={handleDownloadReceipt} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 px-3 rounded-xl transition flex items-center gap-1.5 text-xs"><Download className="w-3.5 h-3.5" /> تنزيل</button>
-              <button type="button" onClick={handlePrintReceipt} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2.5 px-3 rounded-xl transition flex items-center gap-1.5 text-xs"><Printer className="w-3.5 h-3.5" /> طباعة سند</button>
-              <button type="button" onClick={() => { togglePayment(activeReceiptView.id); setActiveReceiptView(null); }} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition flex items-center gap-1.5 text-xs"><Check className="w-3.5 h-3.5" /> اعتماد السداد</button>
+              <button type="button" onClick={handleDownloadReceipt} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 px-3 rounded-xl transition flex items-center gap-1.5 text-xs cursor-pointer"><Download className="w-3.5 h-3.5" /> تنزيل</button>
+              <button type="button" onClick={handlePrintReceipt} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2.5 px-3 rounded-xl transition flex items-center gap-1.5 text-xs cursor-pointer"><Printer className="w-3.5 h-3.5" /> طباعة سند</button>
+              <button type="button" onClick={() => { togglePayment(activeReceiptView.id); setActiveReceiptView(null); }} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition flex items-center gap-1.5 text-xs cursor-pointer"><Check className="w-3.5 h-3.5" /> اعتماد السداد</button>
             </div>
           </div>
         </div>

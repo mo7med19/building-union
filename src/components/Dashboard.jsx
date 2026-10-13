@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Wallet, 
   TrendingUp, 
@@ -13,7 +13,9 @@ import {
   Clock,
   Wrench,
   Vote,
-  Upload
+  Upload,
+  Users,
+  BookOpen
 } from 'lucide-react';
 import AuditLog from './AuditLog';
 
@@ -28,18 +30,30 @@ export default function Dashboard({
   apartments = [], 
   auditLogs = []
 }) {
-  const [announcements, setAnnouncements] = useState([
-    {
-      id: 1,
-      text: 'يرجى الالتزام بسداد الاشتراكات الشهرية في موعد أقصاه يوم 10 من كل شهر لضمان استمرار أعمال الصيانة والنظافة بانتظام.',
-      date: '2026-10-01'
-    }
-  ]);
+  // الحفاظ على الإعلانات مخزنة بذاكرة المتصفح لضمان عدم فقدانها عند التحديث
+  const [announcements, setAnnouncements] = useState(() => {
+    try {
+      const saved = localStorage.getItem('union_announcements');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [
+      {
+        id: 1,
+        text: 'يرجى الالتزام بسداد الاشتراكات الشهرية في موعد أقصاه يوم 10 من كل شهر لضمان استمرار أعمال الصيانة والنظافة بانتظام.',
+        date: '2026-10-01'
+      }
+    ];
+  });
 
   const [newAnnouncement, setNewAnnouncement] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // تم تصحيح هذا السطر: لن يتم عرض أي شقة وهمية إذا كانت القاعدة فارغة
+  useEffect(() => {
+    try {
+      localStorage.setItem('union_announcements', JSON.stringify(announcements));
+    } catch {}
+  }, [announcements]);
+
   const myApartment = (apartments || []).find(
     (apt) => apt.number === currentUser?.apartment || apt.id === currentUser?.aptId || apt.owner === currentUser?.name
   );
@@ -142,7 +156,7 @@ export default function Dashboard({
                   </span>
                   <button
                     onClick={() => setActiveTab('finance')}
-                    className="bg-amber-500 hover:bg-amber-600 text-slate-900 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 transition shadow-sm"
+                    className="bg-amber-500 hover:bg-amber-600 text-slate-900 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 transition shadow-sm cursor-pointer"
                   >
                     <Upload className="w-3.5 h-3.5" /> سدد الآن
                   </button>
@@ -152,10 +166,11 @@ export default function Dashboard({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {/* أقسام الوصول السريع للساكن */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <button
             onClick={() => setActiveTab('finance')}
-            className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-amber-400 transition text-right group space-y-2"
+            className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-amber-400 transition text-right group space-y-2 cursor-pointer"
           >
             <div className="p-2 bg-amber-50 text-amber-600 rounded-xl w-fit">
               <CreditCard className="w-5 h-5" />
@@ -168,7 +183,7 @@ export default function Dashboard({
 
           <button
             onClick={() => setActiveTab('maintenance')}
-            className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-amber-400 transition text-right group space-y-2"
+            className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-amber-400 transition text-right group space-y-2 cursor-pointer"
           >
             <div className="p-2 bg-rose-50 text-rose-600 rounded-xl w-fit">
               <Wrench className="w-5 h-5" />
@@ -181,7 +196,7 @@ export default function Dashboard({
 
           <button
             onClick={() => setActiveTab('polls')}
-            className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-amber-400 transition text-right group space-y-2 col-span-2 sm:col-span-1"
+            className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-amber-400 transition text-right group space-y-2 cursor-pointer"
           >
             <div className="p-2 bg-blue-50 text-blue-600 rounded-xl w-fit">
               <Vote className="w-5 h-5" />
@@ -189,6 +204,19 @@ export default function Dashboard({
             <div>
               <h3 className="font-bold text-xs text-slate-900">تصويت القرارات</h3>
               <p className="text-[10px] text-slate-500 mt-0.5">المشاركة في قرارات البرج</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('guidelines')}
+            className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-amber-400 transition text-right group space-y-2 cursor-pointer"
+          >
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl w-fit">
+              <BookOpen className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-xs text-slate-900">لائحة اتحاد الملاك</h3>
+              <p className="text-[10px] text-slate-500 mt-0.5">التعليمات وقواعد البرج</p>
             </div>
           </button>
         </div>
@@ -295,7 +323,7 @@ export default function Dashboard({
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="text-xs bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition shadow-2xs"
+            className="text-xs bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition shadow-2xs cursor-pointer"
           >
             <PlusCircle className="w-3.5 h-3.5" /> إعلان جديد
           </button>
@@ -310,7 +338,7 @@ export default function Dashboard({
               </div>
               <button
                 onClick={() => handleDeleteAnnouncement(item.id)}
-                className="text-amber-800/40 hover:text-rose-600 p-1 transition rounded-md"
+                className="text-amber-800/40 hover:text-rose-600 p-1 transition rounded-md cursor-pointer"
                 title="حذف الإعلان"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -338,14 +366,14 @@ export default function Dashboard({
               <div className="flex gap-2">
                 <button
                   type="submit"
-                  className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2 rounded-xl text-xs transition"
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2 rounded-xl text-xs transition cursor-pointer"
                 >
                   نشر التنبيه
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2 rounded-xl text-xs transition"
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2 rounded-xl text-xs transition cursor-pointer"
                 >
                   إلغاء
                 </button>

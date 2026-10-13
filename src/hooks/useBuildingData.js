@@ -33,7 +33,13 @@ export function useBuildingData(isAdmin, addNotification) {
   // 1. إدارة الشقق
   const fetchApartments = async () => {
     const { data, error } = await supabase.from('apartments').select('*').order('id', { ascending: true });
-    if (!error && data) setApartments(data);
+    if (!error && data) {
+      const formatted = data.map(apt => ({
+        ...apt,
+        extraFees: Array.isArray(apt.extraFees) ? apt.extraFees : (apt.extraFees ? JSON.parse(apt.extraFees) : [])
+      }));
+      setApartments(formatted);
+    }
   };
 
   const addApartment = async (aptData) => {
@@ -47,7 +53,8 @@ export function useBuildingData(isAdmin, addNotification) {
           notes: aptData.notes || 'ملكية خاصة',
           paid: false,
           status: 'unpaid',
-          password: aptData.password || '1234'
+          password: aptData.password || '1234',
+          extraFees: []
         }])
         .select();
 
@@ -70,6 +77,20 @@ export function useBuildingData(isAdmin, addNotification) {
     } catch (error) {
       console.error('فشل تحديث الشقة:', error.message);
       alert('فشل التحديث: ' + error.message);
+    }
+  };
+
+  const updateApartmentExtraFees = async (id, newExtraFees) => {
+    try {
+      const { error } = await supabase
+        .from('apartments')
+        .update({ extraFees: newExtraFees })
+        .eq('id', id);
+
+      if (error) throw error;
+      setApartments(prev => prev.map(apt => apt.id === id ? { ...apt, extraFees: newExtraFees } : apt));
+    } catch (error) {
+      console.error('فشل حفظ المبالغ الإضافية في السحابة:', error.message);
     }
   };
 
@@ -99,9 +120,7 @@ export function useBuildingData(isAdmin, addNotification) {
   const fetchMaintenance = async () => {
     try {
       const { data, error } = await supabase.from('maintenance').select('*');
-      if (!error && data) {
-        setMaintenance(data);
-      }
+      if (!error && data) setMaintenance(data);
     } catch (err) {
       console.error('خطأ في جلب الصيانة:', err.message);
     }
@@ -142,9 +161,21 @@ export function useBuildingData(isAdmin, addNotification) {
     }
   };
 
+  const deleteMaintenance = async (id) => {
+    try {
+      const { error } = await supabase.from('maintenance').delete().eq('id', id);
+      if (error) throw error;
+      setMaintenance(prev => prev.filter(item => item.id !== id));
+      if (addNotification) addNotification('تم حذف بلاغ الصيانة بنجاح');
+    } catch (error) {
+      console.error('فشل حذف البلاغ:', error.message);
+      alert('فشل الحذف: ' + error.message);
+    }
+  };
+
   // 3. إدارة المصروفات
   const fetchExpenses = async () => {
-    const { data, error } = await supabase.from('expenses').select('*');
+    const { data, error } = await supabase.from('expenses').select('*').order('id', { ascending: false });
     if (!error && data) setExpenses(data);
   };
 
@@ -153,20 +184,33 @@ export function useBuildingData(isAdmin, addNotification) {
       const { data, error } = await supabase
         .from('expenses')
         .insert([{
+          id: expData.id || Date.now(),
           title: expData.title,
-          amount: expData.amount,
+          amount: parseFloat(expData.amount),
           category: expData.category || 'عام',
-          date: new Date().toISOString().split('T')[0]
+          date: expData.date || new Date().toISOString().split('T')[0]
         }])
         .select();
 
       if (error) throw error;
       if (data && data.length > 0) {
         setExpenses(prev => [data[0], ...prev]);
+        if (addNotification) addNotification(`تم تسجيل مصروف جديد: ${expData.title}`);
       }
     } catch (error) {
       console.error('فشل إضافة المصروف:', error.message);
       alert('فشل إضافة المصروف: ' + error.message);
+    }
+  };
+
+  const deleteExpense = async (id) => {
+    try {
+      const { error } = await supabase.from('expenses').delete().eq('id', id);
+      if (error) throw error;
+      setExpenses(prev => prev.filter(e => e.id !== id));
+    } catch (error) {
+      console.error('فشل حذف المصروف:', error.message);
+      alert('فشل حذف المصروف: ' + error.message);
     }
   };
 
@@ -176,12 +220,11 @@ export function useBuildingData(isAdmin, addNotification) {
     if (!error && data) setNotifications(data);
   };
 
-  // 5. الاستطلاعات (Polls)
+  // 5. الاستطلاعات
   const fetchPolls = async () => {
     try {
       const { data, error } = await supabase.from('polls').select('*');
       if (!error && data) {
-        // تحويل title القادم من القاعدة إلى question ليتوافق مع مكون Polls.jsx
         const formattedPolls = data.map(poll => ({
           ...poll,
           question: poll.title || poll.question
@@ -193,12 +236,13 @@ export function useBuildingData(isAdmin, addNotification) {
     }
   };
 
-const addPoll = async (pollData) => {
+  const addPoll = async (pollData) => {
     try {
       const { data, error } = await supabase
         .from('polls')
         .insert([{
-          title: pollData.question || pollData.title, // استقبال السؤال وإرساله كعنوان للجدول
+          id: pollData.id || Date.now(),
+          title: pollData.question || pollData.title,
           options: pollData.options
         }])
         .select();
@@ -206,6 +250,7 @@ const addPoll = async (pollData) => {
       if (error) throw error;
       if (data && data.length > 0) {
         setPolls(prev => [data[0], ...prev]);
+        if (addNotification) addNotification(`تم طرح تصويت جديد: ${pollData.question}`);
       }
     } catch (error) {
       console.error('فشل إضافة الاستطلاع:', error.message);
@@ -213,9 +258,19 @@ const addPoll = async (pollData) => {
     }
   };
 
-  const handleVote = async (pollId, optionIndex) => {
-    // دالة التصويت المحلية أو السحابية
+  const deletePoll = async (id) => {
+    try {
+      const { error } = await supabase.from('polls').delete().eq('id', id);
+      if (error) throw error;
+      setPolls(prev => prev.filter(p => p.id !== id));
+      if (addNotification) addNotification('تم حذف الاستطلاع بنجاح');
+    } catch (error) {
+      console.error('فشل حذف الاستطلاع:', error.message);
+      alert('فشل حذف الاستطلاع: ' + error.message);
+    }
   };
+
+  const handleVote = async (pollId, optionIndex) => {};
 
   return {
     apartments,
@@ -227,13 +282,17 @@ const addPoll = async (pollData) => {
     refreshData: fetchAllData,
     addApartment,
     updateApartment,
+    updateApartmentExtraFees,
     deleteApartment,
     togglePayment,
     updateApartmentReceipt,
     addMaintenance,
     updateMaintenanceStatus,
+    deleteMaintenance,
     addExpense,
+    deleteExpense,
     addPoll,
+    deletePoll,
     handleVote
   };
 }
